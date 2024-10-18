@@ -13,6 +13,7 @@
 
 int m_EventsUseReset = GetPrivateProfileIntA("General", "byReset", 0, "./eel.ini");
 
+int m_BloodCastleEntryLevelAll[16][2];
 int m_BloodCastleEntryLevelCommon[7][2];
 int m_BloodCastleEntryLevelSpecial[7][2];
 int m_DevilSquareEntryLevelCommon[6][2];
@@ -111,9 +112,55 @@ void __declspec (naked) fixCheckLevelToReset_DS() {
 void __declspec (naked) fixCheckLevelToReset_BC() {
 	static DWORD jumpBack = 0x0087469D;
 	_asm {
-		mov ecx, MainDllAddrResets
-		movzx edx, word ptr[ecx]
+		mov eax, MainDllAddrResets
+		movzx ecx, word ptr[eax]
 		JMP jumpBack
+	}
+}
+
+DWORD levelsAddrBC = (DWORD)(&m_BloodCastleEntryLevelAll);
+DWORD levelsAddrBC_2 = (DWORD)(&m_BloodCastleEntryLevelAll) + 0x4;
+
+DWORD actualFV_BC = 0x0;
+void __declspec (naked) moveSpecialAddr_BC(){
+	static DWORD jumpBack = 0x008746E5;
+
+	__asm {
+		// Parte de assembly que compara e realiza a operação
+		mov ecx, levelsAddrBC
+		cmp edx, [ecx + eax * 8]
+		jmp jumpBack            // Salta de volta para o endereço original
+	}
+}
+
+void __declspec (naked) moveSpecialAddr_BC_2() {
+	static DWORD jumpBack = 0x008746FA;
+
+	_asm {
+		mov ecx, levelsAddrBC_2
+		cmp edx, [ecx + eax * 8]
+		JMP jumpBack
+	}
+}
+
+// mov eax, [edx + ecx * 8 + 00000638]
+void __declspec (naked) moveSpecialAddr_BC_3() {
+	static DWORD jumpBack = 0x00874F05;
+
+	__asm {
+		mov edx, levelsAddrBC_2
+		mov eax, [edx + ecx * 8]
+		jmp jumpBack            // Salta de volta para o endereço original
+	}
+}
+
+void __declspec (naked) moveSpecialAddr_BC_4() {
+	static DWORD jumpBack = 0x00874F1F;
+
+	_asm {
+		mov ecx, levelsAddrBC
+		mov edx, [ecx + eax * 8]
+		jmp jumpBack            // Salta de volta para o endereço original
 	}
 }
 
@@ -128,12 +175,12 @@ void __declspec (naked) fixCheckLevelToReset_IL() {
 
 DWORD jumpBack_IL_ML = 0x0;
 DWORD resets = 0;
-void fixCheckLevelToReset_IL_ML_ex() {
+void fixCheckLevelToReset_ML_ex() {
 	resets = *(DWORD*)(MainDllAddrResets);
 }
 void __declspec (naked) fixCheckLevelToReset_IL_ML() {
 	_asm {
-		call fixCheckLevelToReset_IL_ML_ex
+		call fixCheckLevelToReset_ML_ex
 		mov eax, resets
 		xor ecx, ecx
 		mov ecx, eax
@@ -160,7 +207,7 @@ void InitEventEntryLevel(DWORD _MAINDLL) // OK
 		SetCompleteHook(0xE9, 0x0087879A, &fixCheckLevelToReset_DS); //DS
 		SetCompleteHook(0xE9, 0x00874694, &fixCheckLevelToReset_BC); //BC
 		SetCompleteHook(0xE9, 0x00869380, &fixCheckLevelToReset_IL); //IL
-		SetCompleteHook(0xE9, IL_ML_addr, &fixCheckLevelToReset_IL_ML); //IL_ML
+		SetCompleteHook(0xE9, IL_ML_addr, &fixCheckLevelToReset_IL_ML); //IL_ML ??
 		SetByte(_MAINDLL + 0x24E6, 0x7F); // Compare IL_ML to greater than
 	}
 
@@ -185,6 +232,15 @@ void InitEventEntryLevel(DWORD _MAINDLL) // OK
 		SetDword(0x00877CC1 + (0x1A * n), m_DevilSquareEntryLevelSpecial[n][0]);
 		SetDword(0x00877CCE + (0x1A * n), m_DevilSquareEntryLevelSpecial[n][1]);
 	}
+
+	MemoryCpy(_MAINDLL + 0x16180, m_BloodCastleEntryLevelCommon, sizeof(m_BloodCastleEntryLevelCommon));
+	memcpy(m_BloodCastleEntryLevelAll, m_BloodCastleEntryLevelCommon, sizeof(m_BloodCastleEntryLevelCommon));
+	memcpy(m_BloodCastleEntryLevelAll[8], m_BloodCastleEntryLevelSpecial, sizeof(m_BloodCastleEntryLevelSpecial));
+
+	SetCompleteHook(0xE9, 0x008746DE, &moveSpecialAddr_BC); //BC special
+	SetCompleteHook(0xE9, 0x008746F3, &moveSpecialAddr_BC_2); //BC special
+	SetCompleteHook(0xE9, 0x00874EFE, &moveSpecialAddr_BC_3); //BC special
+	SetCompleteHook(0xE9, 0x00874F18, &moveSpecialAddr_BC_4); //BC special
 
 	MemoryCpy(0x00D457C8, m_ChaosCastleEntryLevelCommon, sizeof(m_ChaosCastleEntryLevelCommon));
 
